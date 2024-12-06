@@ -9,14 +9,25 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * This class represents a socket for sending datagram packets over a
- * simulated network.
+ * Klasa {@code SimulatedDatagramSocket} proširuje klasu {@link DatagramSocket}
+ * i simulira mrežno ponašanje s gubitkom paketa, kašnjenjem, jitterom i
+ * kašnjenjem slanja paketa.
  *
- * <p>A datagram socket is the sending point for a packet delivery
- * service. Each packet sent on a datagram socket is individually
- * addressed and routed. Multiple packets sent from one machine
- * to another may be routed differently, and may arrive in any order
- * depending on parameters of the simulated network.
+ * <p>Ova klasa omogućuje testiranje aplikacija koje koriste UDP protokol u
+ * uvjetima koji simuliraju mrežne probleme. Simulacija uključuje nasumično
+ * gubljenje paketa i uvođenje kašnjenja prijenosa.</p>
+ *
+ * <p>Primjer upotrebe:</p>
+ * <pre>
+ *     double lossRate = 0.1; // 10% gubitka paketa
+ *     int sendingDelay = 50; // Kašnjenje slanja od 50 ms
+ *     int averageDelay = 100; // Prosječno kašnjenje od 100 ms
+ *     int jitter = 20; // Varijacija kašnjenja od ±20 ms
+ *
+ *     SimulatedDatagramSocket socket = new SimulatedDatagramSocket(lossRate, sendingDelay, averageDelay, jitter);
+ *     DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
+ *     socket.send(packet);
+ * </pre>
  *
  *
  * @author  Krešimir Pripužić <kresimir.pripuzic@fer.hr>
@@ -27,23 +38,41 @@ import java.util.logging.Logger;
 public class SimulatedDatagramSocket extends DatagramSocket {
 
     /**
-     * Packet loss ratio of the simulated network.
+     * Omjer izgubljenih paketa u simuliranoj mreži.
+     * Vrijednost mora biti između 0.0 (nema gubitka) i 1.0 (svi paketi se gube).
      */
     private double lossRate;
     /**
-     * Various parameters of the simulated network. All these parameters
-     * are in milliseconds.
+     * Prosječno kašnjenje prijenosa paketa u milisekundama, uključujući kašnjenje slanja.
      */
     private int averageDelay;
+    /**
+     * Varijacija kašnjenja (jitter) paketa u milisekundama.
+     */
     private int jitter;
+    /**
+     * Kašnjenje slanja paketa u milisekundama.
+     */
     private int sendingDelay;
     /**
-     * Some attributes for internal use.
+     * Generator slučajnih brojeva za simulaciju gubitka i kašnjenja paketa.
      */
     private Random random;
+    /**
+     * Akumulirano kašnjenje slanja paketa.
+     */
     private int cumulatedSendingDelay;
 
     /**
+     *
+     * Kreira datagramski socket za slanje paketa putem simulirane mreže.
+     *
+     * <p>Postavlja parametre za simulaciju mreže, uključujući omjer izgubljenih
+     * paketa, kašnjenje slanja, prosječno kašnjenje i jitter. Timeout za
+     * čekanje odgovora postavlja se na dvostruku vrijednost od
+     * {@code jitter + averageDelay}.</p>
+     *
+     *
      * Constructs a datagram socket for sending datagram packets over a
      * simulated network and binds it to any available port
      * on the local host machine.  The socket will be bound to the
@@ -91,6 +120,13 @@ public class SimulatedDatagramSocket extends DatagramSocket {
     }
 
     /**
+     *
+     * Šalje UDP paket preko simulirane mreže s primjenom simulacije gubitka, kašnjenja i jittera.
+     * <p>Paket se gubi s vjerojatnošću određeno parametrom {@code lossRate}.
+     * Ako se paket ne izgubi, primjenjuje se kašnjenje prijenosa i jitter
+     * prije stvarnog slanja paketa.</p>
+     *
+     *
      * Sends a datagram packet from this socket over the simulated network.
      * The <code>DatagramPacket</code> includes information indicating the
      * data to be sent, its length, the IP address of the remote host,
@@ -135,18 +171,33 @@ public class SimulatedDatagramSocket extends DatagramSocket {
     }
 
     /**
+     * Interna klasa za simulaciju prijenosa paketa s kašnjenjem.
      * Inner class for internal use.
      */
     private class OutgoingDatagramPacket implements Runnable {
-
+        /**
+         * Paket koji treba poslati.
+         */
         private final DatagramPacket packet;
+        /**
+         * Vrijeme kašnjenja prije slanja u milisekundama.
+         */
         private final long time;
 
+        /**
+         * Kreira instancu klase {@code OutgoingDatagramPacket}.
+         *
+         * @param packet paket koji treba poslati
+         * @param time ukupno vrijeme kašnjenja u milisekundama
+         */
         private OutgoingDatagramPacket(DatagramPacket packet, long time) {
             this.packet = packet;
             this.time = time;
         }
 
+        /**
+         * Izvršava simulaciju kašnjenja i šalje paket.
+         */
         @Override
         public void run() {
             try {
