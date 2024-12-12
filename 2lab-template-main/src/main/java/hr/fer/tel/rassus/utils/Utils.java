@@ -1,5 +1,6 @@
 package hr.fer.tel.rassus.utils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import hr.fer.tel.rassus.Sensor;
 import hr.fer.tel.rassus.stupidudp.network.EmulatedSystemClock;
 
@@ -86,21 +87,27 @@ public class Utils {
         return min + random.nextInt(max - min);
     }
 
-    // Helper method to serialize ReadingDTO to byte array
-    public static byte[] serializeReadingDTO(ReadingDTO reading) throws Exception {
-        try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-             ObjectOutputStream objectStream = new ObjectOutputStream(byteStream)) {
-            objectStream.writeObject(reading);
-            return byteStream.toByteArray();
-        }
+    public static String generateJsonData(Integer id, String address, Integer port) {
+        return "{\"id\": " + "\""
+                + id + "\"" +
+                ", \"address\" : "
+                + "\"" +  address + "\"" +
+                ", \"port\" : "
+                + "\"" + port + "\"" +
+                "}";
     }
 
-    // Helper method to deserialize byte array into ReadingDTO
-    public static  ReadingDTO deserializeReadingDTO(byte[] data) throws Exception {
-        try (ByteArrayInputStream byteStream = new ByteArrayInputStream(data);
-             ObjectInputStream objectStream = new ObjectInputStream(byteStream)) {
-            return (ReadingDTO) objectStream.readObject();
+    public static SensorData parseJson(String jsonValue) {
+        try {
+            // Use Jackson for parsing
+            ObjectMapper objectMapper = new ObjectMapper();
+            // Assuming the JSON represents a SensorData object
+            SensorData sensorData = objectMapper.readValue(jsonValue, SensorData.class);
+            return sensorData;
+        } catch (Exception e) {
+            System.err.println("Failed to parse JSON: " + e.getMessage());
         }
+        return  null;
     }
 
 }

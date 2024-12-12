@@ -1,0 +1,12 @@
+<configuration>
+
+    <!-- Suppress Kafka logs -->
+    <logger name="org.apache.kafka" level="OFF"/>
+    <logger name="org.springframework.kafka" level="OFF"/>
+
+    <!-- Root logging level -->
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
