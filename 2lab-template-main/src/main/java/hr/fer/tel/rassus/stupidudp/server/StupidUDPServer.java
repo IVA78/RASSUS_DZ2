@@ -37,7 +37,7 @@ public class StupidUDPServer {
         byte[] rcvBuf = new byte[1024]; // Buffer za primanje datagrama - SOCKET
         byte[] sendBuffAck; // Buffer za slanje datagrama
 
-        while (true) {
+        while (!Sensor.getStop()) {
             try {
                 boolean repeated = false;
 
@@ -92,7 +92,12 @@ public class StupidUDPServer {
                 //e.printStackTrace();
             }
         }
+        stopServer();
     }
 
+    public void stopServer() {
+        socket.close();  // Close the socket to stop receiving packets
+        System.out.println("Server " + Sensor.getSensorId() + " stopped.");
+    }
 
 }

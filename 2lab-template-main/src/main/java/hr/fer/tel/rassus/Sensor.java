@@ -36,6 +36,22 @@ public class Sensor {
     private volatile  static Boolean stop = false;
     private volatile static List<SensorData> neighbourSensors = new ArrayList<>();
 
+    public static Boolean getStart() {
+        return start;
+    }
+
+    public static void setStart(Boolean start) {
+        Sensor.start = start;
+    }
+
+    public static Boolean getStop() {
+        return stop;
+    }
+
+    public static void setStop(Boolean stop) {
+        Sensor.stop = stop;
+    }
+
     public static Integer getSensorId() {
         return sensorId;
     }
@@ -107,104 +123,113 @@ public class Sensor {
 
         //cekanje kontrolne poruke "Start" - dohvat susjeda
         //dohvat podataka o susjednim cvorovima -> CONSUMER
-        Thread findNeighbours = new Thread(() -> {
 
-            sensorConsumerRegister.seekToBeginning(sensorConsumerRegister.assignment());
 
-            while (!start) {
-                // dohvat poruka sa kafke
-                ConsumerRecords<String, String> registrationRecords = sensorConsumerRegister.poll(Duration.ofMillis(1000));
+        sensorConsumerRegister.seekToBeginning(sensorConsumerRegister.assignment());
 
-                for (ConsumerRecord<String, String> registrationRecord : registrationRecords) {
-                    String jsonValue = registrationRecord.value(); //Dohvat poruke iz zapisa
-                    System.out.println("-----------------------------------------------------------------------------" +
-                            "");
-                    System.out.println("Raw JSON Value: " + jsonValue);
+        while (!start) {
+            // dohvat poruka sa kafke
+            ConsumerRecords<String, String> registrationRecords = sensorConsumerRegister.poll(Duration.ofMillis(1000));
 
-                    try {
-                        // Parsiranje JSON-a u SensorData objekt
-                        SensorData neighbourSensorData = Utils.parseJson(jsonValue);
-                        System.out.println("Parsed Neighbour Sensor Data: " + neighbourSensorData);
-                        if(!neighbourSensorData.getId().equals(getSensorId()) ) { //nije rijec o trenutnom senzoru
-                            Boolean exists = false;
-                            for (SensorData existingSensor : Sensor.getNeighbourSensors()) {
-                                if (existingSensor.getId().equals(neighbourSensorData.getId())) {
-                                    exists =  true; // senzor vec postoji u listi
-                                }
+            for (ConsumerRecord<String, String> registrationRecord : registrationRecords) {
+                String jsonValue = registrationRecord.value(); //Dohvat poruke iz zapisa
+                System.out.println("-----------------------------------------------------------------------------" +
+                        "");
+                System.out.println("Raw JSON Value: " + jsonValue);
+
+                try {
+                    // Parsiranje JSON-a u SensorData objekt
+                    SensorData neighbourSensorData = Utils.parseJson(jsonValue);
+                    System.out.println("Parsed Neighbour Sensor Data: " + neighbourSensorData);
+                    if(!neighbourSensorData.getId().equals(getSensorId()) ) { //nije rijec o trenutnom senzoru
+                        Boolean exists = false;
+                        for (SensorData existingSensor : Sensor.getNeighbourSensors()) {
+                            if (existingSensor.getId().equals(neighbourSensorData.getId())) {
+                                exists =  true; // senzor vec postoji u listi
                             }
-                            if(!exists){
-                                neighbourSensors.add(neighbourSensorData);
-                            }
-
+                        }
+                        if(!exists){
+                            neighbourSensors.add(neighbourSensorData);
                         }
 
-                    } catch (Exception e) {
-                        System.err.println("Failed to parse JSON: " + e.getMessage());
                     }
-                }
-                System.out.println("Sensor id: " + getSensorId());
-                for(SensorData neighbour : neighbourSensors) {
-                    System.out.println(neighbour);
-                }
 
-                //provjera je li stigla poruka "Start"
-                ConsumerRecords<String, String> commandRecords = sensorConsumerCommand.poll(Duration.ofMillis(1000));
-                sensorConsumerCommand.seekToEnd(sensorConsumerCommand.assignment());
-                ConsumerRecord<String, String> lastRecord = null;
-                while (lastRecord == null) {
-                    // Poll for new messages
-                    var records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
-                    for (ConsumerRecord<String, String> commandRecord : records) {
-                        lastRecord = commandRecord;
-                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to parse JSON: " + e.getMessage());
                 }
+            }
+            System.out.println("Sensor id: " + getSensorId());
+            for(SensorData neighbour : neighbourSensors) {
+                System.out.println(neighbour);
+            }
 
-                if(lastRecord.value().equals("Start")) {
-                    start = true;
-                    break;
+            //provjera je li stigla poruka "Start"
+            sensorConsumerCommand.seekToEnd(sensorConsumerCommand.assignment());
+            ConsumerRecord<String, String> lastRecord = null;
+            while (lastRecord == null) {
+                // Poll for new messages
+                var records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
+                for (ConsumerRecord<String, String> commandRecord : records) {
+                    lastRecord = commandRecord;
                 }
+            }
 
+            if(lastRecord.value().equals("Start")) {
+                start = true;
+            }
+
+        }
+
+
+
+
+        // Pokretanje UDP servera u zasebnoj dretvi
+        StupidUDPServer stupidUDPServer = new StupidUDPServer(serverPort,0.3, 1000);
+        Thread serverThread = new Thread(() -> {
+            try {
+                stupidUDPServer.startServer();
+            } catch (Exception e) {
+                System.err.println("Server error: " + e.getMessage());
             }
         });
-        findNeighbours.start();
+        serverThread.start();
+
+
+        //sortitanje i izracunavanje srednje vrijednosti u vremenskom prozoru od 5 sekundi
+        //dretva ?
+
+
+        //GLAVNI DIO - funkcionalnost senzora
+        StupidUDPClient stupidUDPClient = new StupidUDPClient(0.3, 1000);
+
+        while(!stop) {
+            //dohvat vlastitog ocitanja (generiranje)
+            ReadingDTO readingDTO = Utils.parseReading(emulatedSystemClock);
+            readingDTO.setSensorId(id);
+            myReadingDTOList.add(readingDTO);
+            System.out.println("My reading (" + getSensorId() + "): "  + readingDTO.toString());
+
+            //slanje ocitanja od drugim senzorima
+            Thread.sleep(1000); // Simulate a delay before the client requests a reading
+            //stupidUDPClient.sendReading( readingDTO, InetAddress.getByName(adress), serverPort);
 
 
 
+            //provjera je li stigla "Stop poruka"
+            sensorConsumerCommand.seekToEnd(sensorConsumerCommand.assignment());
+            ConsumerRecord<String, String> lastRecord = null;
+            while (lastRecord == null) {
+                // Poll for new messages
+                var records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
+                for (ConsumerRecord<String, String> commandRecord : records) {
+                    lastRecord = commandRecord;
+                }
+            }
 
-        /**
-         //UDP klijent i posluzitelj
-         StupidUDPServer stupidUDPServer = new StupidUDPServer(serverPort,0.3, 1000);
-         StupidUDPClient stupidUDPClient = new StupidUDPClient(0.3, 1000);
+            if(lastRecord.value().equals("Stop")) {
+                stop = true;
+            }
 
-         // Pokretanje UDP servera u zasebnoj dretvi
-         Thread serverThread = new Thread(() -> {
-         try {
-         stupidUDPServer.startServer();
-         } catch (Exception e) {
-         System.err.println("Server error: " + e.getMessage());
-         }
-         });
-         serverThread.start();
-
-         //sortitanje i izracunavanje srednje vrijednosti u vremenskom prozoru od 5 sekundi
-         //dretva ?
-
-
-         while(true) {
-         //dohvat vlastitog ocitanja (generiranje)
-         ReadingDTO readingDTO = Utils.parseReading(emulatedSystemClock);
-         readingDTO.setSensorId(id);
-         myReadingDTOList.add(readingDTO);
-         System.out.println(readingDTO.toString());
-
-         //slanje ocitanja od drugim senzorima
-         Thread.sleep(1000); // Simulate a delay before the client requests a reading
-         stupidUDPClient.sendReading( readingDTO, InetAddress.getByName(adress), serverPort);
-
-         }
-         */
-
-
-
+        }
     }
 }
