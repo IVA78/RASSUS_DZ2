@@ -121,26 +121,28 @@ public class Sensor {
 
 
 
-        //cekanje kontrolne poruke "Start" - dohvat susjeda
-        //dohvat podataka o susjednim cvorovima -> CONSUMER
-
-
+        //cekanje kontrolne poruke "Start" - dohvat susjeda -> CONSUMER
         sensorConsumerRegister.seekToBeginning(sensorConsumerRegister.assignment());
-
         while (!start) {
+
+            Thread.sleep(3000);
+
+            // Assign partitions (if not already done by Kafka internally)
+            sensorConsumerRegister.assignment().forEach(topicPartition -> {
+                sensorConsumerRegister.seekToBeginning(Collections.singleton(topicPartition));
+            });
+
             // dohvat poruka sa kafke
             ConsumerRecords<String, String> registrationRecords = sensorConsumerRegister.poll(Duration.ofMillis(1000));
 
             for (ConsumerRecord<String, String> registrationRecord : registrationRecords) {
                 String jsonValue = registrationRecord.value(); //Dohvat poruke iz zapisa
-                System.out.println("-----------------------------------------------------------------------------" +
-                        "");
-                System.out.println("Raw JSON Value: " + jsonValue);
+                //System.out.println("Raw JSON Value: " + jsonValue);
 
                 try {
                     // Parsiranje JSON-a u SensorData objekt
                     SensorData neighbourSensorData = Utils.parseJson(jsonValue);
-                    System.out.println("Parsed Neighbour Sensor Data: " + neighbourSensorData);
+                    //System.out.println("Parsed Neighbour Sensor Data: " + neighbourSensorData);
                     if(!neighbourSensorData.getId().equals(getSensorId()) ) { //nije rijec o trenutnom senzoru
                         Boolean exists = false;
                         for (SensorData existingSensor : Sensor.getNeighbourSensors()) {
@@ -160,21 +162,28 @@ public class Sensor {
             }
             System.out.println("Sensor id: " + getSensorId());
             for(SensorData neighbour : neighbourSensors) {
-                System.out.println(neighbour);
+                System.out.println("Neighbour: " + neighbour);
             }
 
             //provjera je li stigla poruka "Start"
-            sensorConsumerCommand.seekToEnd(sensorConsumerCommand.assignment());
+            sensorConsumerCommand.assignment().forEach(topicPartition -> {
+                sensorConsumerCommand.seekToEnd(Collections.singleton(topicPartition));
+            });
+
             ConsumerRecord<String, String> lastRecord = null;
-            while (lastRecord == null) {
-                // Poll for new messages
-                var records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
+            long time = System.currentTimeMillis();
+            long timeoutMillis = 2000;
+
+            while (lastRecord == null && (System.currentTimeMillis() - time) < timeoutMillis) {
+                ConsumerRecords<String, String> records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
+
+                // Process the polled records
                 for (ConsumerRecord<String, String> commandRecord : records) {
-                    lastRecord = commandRecord;
+                    lastRecord = commandRecord; // Update lastRecord with the latest polled message
                 }
             }
 
-            if(lastRecord.value().equals("Start")) {
+            if(lastRecord != null && lastRecord.value().equals("Start")) {
                 start = true;
             }
 
@@ -210,23 +219,24 @@ public class Sensor {
             System.out.println("My reading (" + getSensorId() + "): "  + readingDTO.toString());
 
             //slanje ocitanja od drugim senzorima
-            Thread.sleep(1000); // Simulate a delay before the client requests a reading
-            //stupidUDPClient.sendReading( readingDTO, InetAddress.getByName(adress), serverPort);
-
-
+            stupidUDPClient.sendReading(readingDTO);
+            Thread.sleep(1000);
 
             //provjera je li stigla "Stop poruka"
-            sensorConsumerCommand.seekToEnd(sensorConsumerCommand.assignment());
+            sensorConsumerCommand.assignment().forEach(topicPartition -> {
+                sensorConsumerCommand.seekToBeginning(Collections.singleton(topicPartition));
+            });
+
             ConsumerRecord<String, String> lastRecord = null;
+
             while (lastRecord == null) {
-                // Poll for new messages
-                var records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
+                ConsumerRecords<String, String> records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
                 for (ConsumerRecord<String, String> commandRecord : records) {
                     lastRecord = commandRecord;
                 }
             }
 
-            if(lastRecord.value().equals("Stop")) {
+            if(lastRecord != null && lastRecord.value().equals("Stop")) {
                 stop = true;
             }
 

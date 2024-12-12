@@ -7,6 +7,7 @@ package hr.fer.tel.rassus.stupidudp.client;
 import hr.fer.tel.rassus.Sensor;
 import hr.fer.tel.rassus.stupidudp.network.*;
 import hr.fer.tel.rassus.utils.ReadingDTO;
+import hr.fer.tel.rassus.utils.SensorData;
 import hr.fer.tel.rassus.utils.Utils;
 import org.springframework.util.SerializationUtils;
 
@@ -32,7 +33,7 @@ public class StupidUDPClient {
     public StupidUDPClient( double lossRate, int averageDelay) throws Exception {
         this.socket = new SimpleSimulatedDatagramSocket(lossRate, averageDelay); //SOCKET
     }
-    public void sendReading(ReadingDTO readingDTO, InetAddress neighbor, int port) throws IOException {
+    public void sendReading(ReadingDTO readingDTO) throws IOException {
 
         System.out.println("Client " + Sensor.getSensorId() + "| sends: " + readingDTO + " to sensor "+ readingDTO.getSensorId());
 
@@ -42,13 +43,16 @@ public class StupidUDPClient {
         DatagramPacket packetAck = new DatagramPacket(confirm, confirm.length);
 
         //petlja za slanje ocitanja svim susjedima
-
-        InetAddress address = InetAddress.getByName("localhost");
-
-        DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, address, port);
+        for(SensorData neighbour : Sensor.getNeighbourSensors()) {
 
 
-        while(true) {
+            InetAddress address = InetAddress.getByName(neighbour.getAddress());
+            Integer port = neighbour.getPort();
+
+            DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, address, port);
+
+
+            System.out.println("Client " + Sensor.getSensorId() + "| sending data to sensor with id " + neighbour.getId()+" on port " + neighbour.getPort());
             socket.send(packet); //SENDTO
 
             try {
@@ -69,10 +73,8 @@ public class StupidUDPClient {
                 Logger.getLogger(StupidUDPClient.class.getClass().getName()).log(Level.ALL, "Something went wrong", exception);
             }
             System.out.print("\n");
+
         }
-
-
-        //socket.close();
 
     }
 }

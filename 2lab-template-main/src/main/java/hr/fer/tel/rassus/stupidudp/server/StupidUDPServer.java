@@ -63,7 +63,7 @@ public class StupidUDPServer {
 
                 // Prepare ACK message
                 if (!repeated) {
-                    msg = "ACK for sensor with ID: " + readingDTO.getSensorId();
+                    msg = "ACK from sensor with ID: " + Sensor.getSensorId();
                     readingDTOList.add(readingDTO);
                     Sensor.setNeighboursReadingDTOList(readingDTOList);
                     Sensor.setVectorTime(Sensor.getVectorTime() + 1);
