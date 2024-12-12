@@ -4,119 +4,75 @@
  */
 package hr.fer.tel.rassus.stupidudp.client;
 
+import hr.fer.tel.rassus.Sensor;
 import hr.fer.tel.rassus.stupidudp.network.*;
+import hr.fer.tel.rassus.utils.ReadingDTO;
+import hr.fer.tel.rassus.utils.Utils;
+import org.springframework.util.SerializationUtils;
+
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketTimeoutException;
+import java.net.*;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+
 /**
- * Klasa {@code StupidUDPClient} predstavlja jednostavan UDP klijent koji šalje
- * niz znakova serveru, pri čemu se svaki znak šalje kao zaseban UDP paket.
- * Nakon što server obradi podatke, klijent prima obrađene podatke natrag.
+ * ULOGA UDP KLIJENTA
  *
- * <p>Klijent koristi UDP protokol za komunikaciju s poslužiteljem. Za simulaciju
- * mrežnih uvjeta (gubitak paketa i kašnjenje) koristi se klasa
- * {@link SimpleSimulatedDatagramSocket}.</p>
- *
- * <p>Primjer komunikacije:</p>
- * <pre>
- * Klijent šalje: "hello"
- * Server prima: "hello"
- * Server šalje: "HELLO"
- * Klijent prima: "HELLO"
- * </pre>
- *
- * @author Krešimir Pripužić <kresimir.pripuzic@fer.hr>
+ * 0. Pokretanje komunikacije
+ * 1. Slanje podataka drugim cvorovima
+ * 2. Primanje ACK poruke s naglaskom na restransmisiju
  */
+
 public class StupidUDPClient {
 
-    /**
-     * Port na kojem server osluškuje dolazne zahtjeve.
-     */
-    static final int PORT = 10001; // server port
+    private SimpleSimulatedDatagramSocket socket;
 
-    /**
-     * Ulazna točka aplikacije.
-     *
-     * <p>Glavna metoda klijenta stvara UDP socket za komunikaciju sa serverom.
-     * Klijent šalje svaki znak iz niza kao poseban UDP paket i zatim prima
-     * obrađeni niz od servera. Komunikacija se odvija preko simulirane mreže
-     * s parametrima za gubitak paketa i kašnjenje.</p>
-     *
-     * @param args argumenti komandne linije (ne koriste se)
-     * @throws IOException ako dođe do pogreške prilikom slanja ili primanja podataka
-     */
-    public static void main(String args[]) throws IOException {
+    public StupidUDPClient( double lossRate, int averageDelay) throws Exception {
+        this.socket = new SimpleSimulatedDatagramSocket(lossRate, averageDelay); //SOCKET
+    }
+    public void sendReading(ReadingDTO readingDTO, InetAddress neighbor, int port) throws IOException {
 
-        // Inicijalizacija stringa koji se šalje
-        String sendString = "Any string...";
+        System.out.println("Client " + Sensor.getSensorId() + "| sends: " + readingDTO + " to sensor "+ readingDTO.getSensorId());
 
-        // Buffer za primanje podataka
-        byte[] rcvBuf = new byte[256]; // received bytes
+        byte[] sendBuf = SerializationUtils.serialize(readingDTO);
+        byte [] confirm = new byte[256];
 
-        // encode this String into a sequence of bytes using the platform's
-        // default charset and store it into a new byte array
+        DatagramPacket packetAck = new DatagramPacket(confirm, confirm.length);
 
-        // IP adresa servera (localhost)
-        // determine the IP address of a host, given the host's name
+        //petlja za slanje ocitanja svim susjedima
+
         InetAddress address = InetAddress.getByName("localhost");
 
-        // Kreira UDP socket sa simuliranim mrežnim parametrima
-        // create a datagram socket and bind it to any available port on the local host
-        //DatagramSocket socket = new SimulatedDatagramSocket(0.2, 1, 200, 50); //SOCKET
-        DatagramSocket socket = new SimpleSimulatedDatagramSocket(0.2, 200); //SOCKET
+        DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, address, port);
 
-        // Slanje svakog znaka kao zaseban UDP paket
-        System.out.print("Client sends: ");
-        // send each character as a separate datagram packet
-        for (int i = 0; i < sendString.length(); i++) {
-            byte[] sendBuf = new byte[1];// Buffer za slanje
-            sendBuf[0] = (byte) sendString.charAt(i);
 
-            // Stvaranje DatagramPacket-a za slanje
-            // create a datagram packet for sending data
-            DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length,
-                    address, PORT);
-
-            // Slanje paketa
-            // send a datagram packet from this socket
+        while(true) {
             socket.send(packet); //SENDTO
-            System.out.print(new String(sendBuf));
-        }
-        System.out.println("");
-
-        // String za spremanje primljenih podataka
-        StringBuffer receiveString = new StringBuffer();
-
-        // Primanje obrađenih podataka od servera
-        while (true) {
-            // create a datagram packet for receiving data
-            DatagramPacket rcvPacket = new DatagramPacket(rcvBuf, rcvBuf.length);
 
             try {
-                // Primanje paketa
-                // receive a datagram packet from this socket
-                socket.receive(rcvPacket); //RECVFROM
-            } catch (SocketTimeoutException e) {
-                // Prekid petlje ako dođe do isteka vremena
+                // Cekanje na ACK
+
+                socket.receive(packetAck);
+
+                String receiveString = new String(packetAck.getData(), packetAck.getOffset(), packetAck.getLength());
+
+                String ack = "  Client " + Sensor.getSensorId() +"| Ack recevided --> " + receiveString + " from port " +  packetAck.getPort();
+                System.out.println(ack);
+
                 break;
-            } catch (IOException ex) {
-                Logger.getLogger(StupidUDPClient.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (SocketTimeoutException e) {
+                String lost = "Client " + Sensor.getSensorId() +"| I lost packet, sending again" + " to port " +  packetAck.getPort() + "\n";
+                System.out.println(lost);
+            } catch (Exception exception) {
+                Logger.getLogger(StupidUDPClient.class.getClass().getName()).log(Level.ALL, "Something went wrong", exception);
             }
-
-            // Dodavanje primljenih podataka u rezultat
-            // construct a new String by decoding the specified subarray of bytes using the platform's default charset
-            receiveString.append(new String(rcvPacket.getData(), rcvPacket.getOffset(), rcvPacket.getLength()));
-
+            System.out.print("\n");
         }
-        System.out.println("Client received: " + receiveString);
 
-        // Zatvaranje socket-a
-        // close the datagram socket
-        socket.close(); //CLOSE
+
+        //socket.close();
+
     }
 }

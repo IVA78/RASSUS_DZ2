@@ -4,90 +4,95 @@
  */
 package hr.fer.tel.rassus.stupidudp.server;
 
+import hr.fer.tel.rassus.Sensor;
 import hr.fer.tel.rassus.stupidudp.network.SimpleSimulatedDatagramSocket;
+import hr.fer.tel.rassus.utils.ReadingDTO;
+import org.springframework.util.SerializationUtils;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
+import java.util.List;
 
 /**
- * Klasa {@code StupidUDPServer} predstavlja jednostavan UDP server koji prima
- * poruke od klijenta, obrađuje ih tako da ih pretvori u velika slova,
- * te vraća obrađene poruke natrag klijentu.
+ * ULOGA UDP POSLUZITELJA
  *
- * <p>Server koristi UDP protokol za komunikaciju putem mreže. Za simulaciju
- * mrežnih uvjeta koristi se klasa {@link SimpleSimulatedDatagramSocket},
- * koja omogućuje simulaciju gubitka paketa i kašnjenja u mreži.</p>
- *
- * <p>Primjer komunikacije između klijenta i servera:</p>
- * <pre>
- * Klijent šalje: "hello"
- * Server prima: "hello"
- * Server šalje: "HELLO"
- * </pre>
- *
- * <p>Server kontinuirano čeka dolazne zahtjeve, obrađuje ih i odgovara dok
- * se ne prekine ručno.</p>
- *
- *
- * @author Krešimir Pripužić <kresimir.pripuzic@fer.hr>
+ * 1. Primanje podataka od drugih čvorova:
+ *      - Poslužitelj sluša dolazne UDP poruke na definiranom portu.
+ *      - Prima podatke (očitavanja senzora i vremenske oznake) koje mu šalju drugi čvorovi u mreži.
+ * 2. Odgovaranje na zahtjeve:
+ *      - slanje ACK
  */
+
 public class StupidUDPServer {
-    /**
-     * Port na kojem server osluškuje dolazne zahtjeve.
-     */
-    static final int PORT = 10001; // server port
+    private SimpleSimulatedDatagramSocket socket;
+    private int port;
 
-    /**
-     /**
-     * Ulazna točka aplikacije.
-     *
-     * <p>Glavna metoda stvara UDP socket na specificiranom portu koristeći
-     * klasu {@link SimpleSimulatedDatagramSocket}. Server prima dolazne
-     * poruke, pretvara ih u velika slova i vraća kao odgovor.</p>
-     *
-     * @param args argumenti komandne linije (ne koriste se)
-     * @throws IOException ako dođe do pogreške prilikom slanja ili primanja paketa
+    public StupidUDPServer(int port, double lossRate, int averageDelay) throws Exception {
+        this.socket = new SimpleSimulatedDatagramSocket(port, lossRate, averageDelay); //BIND
+        this.port = port;
+    }
 
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) throws IOException {
+    public void startServer() throws IOException {
+        String msg;
+        byte[] rcvBuf = new byte[1024]; // Buffer za primanje datagrama - SOCKET
+        byte[] sendBuffAck; // Buffer za slanje datagrama
 
-        byte[] rcvBuf = new byte[256]; // Buffer za primljene podatke
-        byte[] sendBuf = new byte[256];// Buffer za slanje podataka
-        String rcvStr;
+        while (true) {
+            try {
+                boolean repeated = false;
 
-        // Kreira UDP socket s parametrima za simulaciju mreže
-        // create a UDP socket and bind it to the specified port on the local
-        // host
-        DatagramSocket socket = new SimpleSimulatedDatagramSocket(PORT, 0.2, 200); //SOCKET -> BIND
+                // Receive a packet
+                DatagramPacket packet = new DatagramPacket(rcvBuf, rcvBuf.length);
+                socket.receive(packet); // RECVFROM
 
-        // Glavna petlja za obradu zahtjeva
-        while (true) { //OBRADA ZAHTJEVA
-            // Kreira DatagramPacket za primanje podataka
-            DatagramPacket packet = new DatagramPacket(rcvBuf, rcvBuf.length);
+                // Extract data from the packet
+                byte[] data = new byte[packet.getLength()];
+                System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
 
-            // Prima paket od klijenta
-            socket.receive(packet); //RECVFROM
+                ReadingDTO readingDTO = (ReadingDTO) SerializationUtils.deserialize(data);
+                System.out.println("Server " + Sensor.getSensorId() +"| received: " + readingDTO);
 
-            // Dekodira primljeni niz bajtova u String
-            // construct a new String by decoding the specified subarray of bytes using the platform's default charset
-            rcvStr = new String(packet.getData(), packet.getOffset(),
-                    packet.getLength());
-            System.out.println("Server received: " + rcvStr);
+                // Check for duplicate readings
+                List<ReadingDTO> readingDTOList = Sensor.getNeighboursReadingDTOList();
+                for (ReadingDTO readingDTOFromList : readingDTOList) {
+                    if (readingDTO.equals(readingDTOFromList)) {
+                        repeated = true;
+                        break;
+                    }
+                }
 
-            // Pretvara primljeni String u velika slova
-            // encode a String into a sequence of bytes using the platform's default charset
-            sendBuf = rcvStr.toUpperCase().getBytes();
-            System.out.println("Server sends: " + rcvStr.toUpperCase());
+                // Prepare ACK message
+                if (!repeated) {
+                    msg = "ACK for sensor with ID: " + readingDTO.getSensorId();
+                    readingDTOList.add(readingDTO);
+                    Sensor.setNeighboursReadingDTOList(readingDTOList);
+                    Sensor.setVectorTime(Sensor.getVectorTime() + 1);
 
-            // Stvara DatagramPacket za slanje odgovora
-            // create a DatagramPacket for sending packets
-            DatagramPacket sendPacket = new DatagramPacket(sendBuf,
-                    sendBuf.length, packet.getAddress(), packet.getPort());
+                    //vector time update??
+                } else {
+                    msg = "ACK (REPEATED) for sensor with ID: " + readingDTO.getSensorId();
+                }
 
-            // Šalje odgovor klijentu
-            // send packet
-            socket.send(sendPacket); //SENDTO
+                System.out.println("Server " + Sensor.getSensorId() +"| sends: " + msg);
+
+                // Send ACK
+                sendBuffAck = msg.getBytes();
+                DatagramPacket sendPacket = new DatagramPacket(sendBuffAck, sendBuffAck.length, packet.getAddress(), packet.getPort());
+                socket.send(sendPacket); // SENDTO
+
+            } catch (ClassCastException e) {
+
+                System.err.println("Server " + Sensor.getSensorId() +"| Error deserializing received data: " + e.getMessage());
+                //e.printStackTrace();
+            } catch (IOException e) {
+                System.err.println("Server " + Sensor.getSensorId() +"| Network error while receiving/sending packets: " + e.getMessage());
+                //e.printStackTrace();
+            } catch (Exception e) {
+                System.err.println("Server " + Sensor.getSensorId() +"| Unexpected server error: " + e.getMessage());
+                //e.printStackTrace();
+            }
         }
     }
+
+
 }
