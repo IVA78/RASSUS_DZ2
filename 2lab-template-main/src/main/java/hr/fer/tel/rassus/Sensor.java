@@ -113,16 +113,15 @@ public class Sensor {
         sensorProducer.flush();
 
         //pretplata na temu "Register" i "Command" -> CONSUMER
-        Consumer<String, String> sensorConsumerRegister = new KafkaConsumer<>(KafkaConfig.getSensorConsumerProperties());
+        Consumer<String, String> sensorConsumerRegister = new KafkaConsumer<>(KafkaConfig.getSensorConsumerRegisterProperties());
         sensorConsumerRegister.subscribe(Collections.singleton("Register"));
-        Consumer<String, String> sensorConsumerCommand = new KafkaConsumer<>(KafkaConfig.getSensorConsumerProperties());
+        Consumer<String, String> sensorConsumerCommand = new KafkaConsumer<>(KafkaConfig.getSensorConsumerCommandProperties());
         sensorConsumerCommand.subscribe(Collections.singleton("Command"));
         Thread.sleep(3000);
 
 
 
         //cekanje kontrolne poruke "Start" - dohvat susjeda -> CONSUMER
-        sensorConsumerRegister.seekToBeginning(sensorConsumerRegister.assignment());
         while (!start) {
 
             Thread.sleep(3000);
@@ -167,19 +166,19 @@ public class Sensor {
 
             //provjera je li stigla poruka "Start"
             sensorConsumerCommand.assignment().forEach(topicPartition -> {
-                sensorConsumerCommand.seekToEnd(Collections.singleton(topicPartition));
+                sensorConsumerCommand.seekToBeginning(Collections.singleton(topicPartition));
             });
 
             ConsumerRecord<String, String> lastRecord = null;
-            long time = System.currentTimeMillis();
-            long timeoutMillis = 2000;
 
-            while (lastRecord == null && (System.currentTimeMillis() - time) < timeoutMillis) {
+            while (lastRecord == null) {
                 ConsumerRecords<String, String> records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
-
-                // Process the polled records
                 for (ConsumerRecord<String, String> commandRecord : records) {
-                    lastRecord = commandRecord; // Update lastRecord with the latest polled message
+                    lastRecord = commandRecord;
+                }
+
+                if(records.isEmpty()){
+                    break;
                 }
             }
 

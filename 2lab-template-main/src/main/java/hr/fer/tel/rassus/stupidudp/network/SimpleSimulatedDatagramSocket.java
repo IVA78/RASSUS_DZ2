@@ -64,7 +64,7 @@ public class SimpleSimulatedDatagramSocket extends DatagramSocket {
         this.averageDelay = averageDelay;
 
         //set time to wait for answer
-        super.setSoTimeout(5000);
+        super.setSoTimeout(7000);
     }
 
     /**

@@ -41,18 +41,18 @@ public class StupidUDPServer {
             try {
                 boolean repeated = false;
 
-                // Receive a packet
+                // primanje datagrama
                 DatagramPacket packet = new DatagramPacket(rcvBuf, rcvBuf.length);
                 socket.receive(packet); // RECVFROM
 
-                // Extract data from the packet
+                // izvlacenje podataka iz datagrama
                 byte[] data = new byte[packet.getLength()];
                 System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
 
                 ReadingDTO readingDTO = (ReadingDTO) SerializationUtils.deserialize(data);
                 System.out.println("Server " + Sensor.getSensorId() +"| received: " + readingDTO);
 
-                // Check for duplicate readings
+                // provjera za duplicirane datagrame
                 List<ReadingDTO> readingDTOList = Sensor.getNeighboursReadingDTOList();
                 for (ReadingDTO readingDTOFromList : readingDTOList) {
                     if (readingDTO.equals(readingDTOFromList)) {
@@ -61,7 +61,7 @@ public class StupidUDPServer {
                     }
                 }
 
-                // Prepare ACK message
+                // priprema ACK poruke
                 if (!repeated) {
                     msg = "ACK from sensor with ID: " + Sensor.getSensorId();
                     readingDTOList.add(readingDTO);
@@ -69,13 +69,14 @@ public class StupidUDPServer {
                     Sensor.setVectorTime(Sensor.getVectorTime() + 1);
 
                     //vector time update??
+
                 } else {
                     msg = "ACK (REPEATED) for sensor with ID: " + readingDTO.getSensorId();
                 }
 
                 System.out.println("Server " + Sensor.getSensorId() +"| sends: " + msg);
 
-                // Send ACK
+                // slanje ACK
                 sendBuffAck = msg.getBytes();
                 DatagramPacket sendPacket = new DatagramPacket(sendBuffAck, sendBuffAck.length, packet.getAddress(), packet.getPort());
                 socket.send(sendPacket); // SENDTO

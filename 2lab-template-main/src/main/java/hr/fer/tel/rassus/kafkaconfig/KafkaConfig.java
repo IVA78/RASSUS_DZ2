@@ -23,7 +23,20 @@ public class KafkaConfig {
     }
 
     //Senzor ima ulogu Consumera kada dohvaća info o susjedima
-    public static Properties getSensorConsumerProperties() {
+    public static Properties getSensorConsumerRegisterProperties() {
+
+        Properties sensorConsumerProperties = new Properties();
+        sensorConsumerProperties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        sensorConsumerProperties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        sensorConsumerProperties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        sensorConsumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, UUID.randomUUID().toString());
+        sensorConsumerProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        sensorConsumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+        return sensorConsumerProperties;
+    }
+
+    public static Properties getSensorConsumerCommandProperties() {
 
         Properties sensorConsumerProperties = new Properties();
         sensorConsumerProperties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");

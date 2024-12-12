@@ -35,8 +35,6 @@ public class StupidUDPClient {
     }
     public void sendReading(ReadingDTO readingDTO) throws IOException {
 
-        System.out.println("Client " + Sensor.getSensorId() + "| sends: " + readingDTO + " to sensor "+ readingDTO.getSensorId());
-
         byte[] sendBuf = SerializationUtils.serialize(readingDTO);
         byte [] confirm = new byte[256];
 
