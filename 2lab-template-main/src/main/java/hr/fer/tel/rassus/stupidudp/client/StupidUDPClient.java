@@ -8,7 +8,6 @@ import hr.fer.tel.rassus.Sensor;
 import hr.fer.tel.rassus.stupidudp.network.*;
 import hr.fer.tel.rassus.utils.ReadingDTO;
 import hr.fer.tel.rassus.utils.SensorData;
-import hr.fer.tel.rassus.utils.Utils;
 import org.springframework.util.SerializationUtils;
 
 import java.io.IOException;
@@ -55,7 +54,7 @@ public class StupidUDPClient {
                 try{
                     socket.send(packet); //SENDTO
                 } catch (Exception e) {
-                    System.out.println("Client " + Sensor.getSensorId() + "| failed to send packet");
+                    System.out.println("Client " + Sensor.getSensorId() + "| failed to send packet"); //moze se dogoditi da senzor ispadne iz mreze pa mu se ne moze poslati paket
                 }
 
                 try {
@@ -74,8 +73,7 @@ public class StupidUDPClient {
                     break;
 
                 } catch (SocketTimeoutException e) {
-                    String lost = "Client " + Sensor.getSensorId() +"| I lost packet, sending again" + " to port " +  packetAck.getPort() + "\n";
-                    System.out.println(lost);
+                    System.out.println("Client " + Sensor.getSensorId() +"| I lost packet, sending again" + " to port " +  packetAck.getPort() + "\n");
                 } catch (Exception exception) {
                     Logger.getLogger(StupidUDPClient.class.getClass().getName()).log(Level.ALL, "Something went wrong", exception);
                 }

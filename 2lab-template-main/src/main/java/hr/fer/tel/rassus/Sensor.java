@@ -1,6 +1,5 @@
 package hr.fer.tel.rassus;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import hr.fer.tel.rassus.kafkaconfig.KafkaConfig;
 import hr.fer.tel.rassus.stupidudp.client.StupidUDPClient;
 import hr.fer.tel.rassus.stupidudp.network.EmulatedSystemClock;
@@ -37,20 +36,8 @@ public class Sensor {
     private volatile  static Boolean stop = false;
     private volatile static List<SensorData> neighbourSensors = new ArrayList<>();
 
-    public static Boolean getStart() {
-        return start;
-    }
-
-    public static void setStart(Boolean start) {
-        Sensor.start = start;
-    }
-
     public static Boolean getStop() {
         return stop;
-    }
-
-    public static void setStop(Boolean stop) {
-        Sensor.stop = stop;
     }
 
     public static Integer getSensorId() {
@@ -80,17 +67,10 @@ public class Sensor {
         return myReadingDTOList;
     }
 
-    public static void setMyReadingDTOList(List<ReadingDTO> myReadingDTOList) {
-        Sensor.myReadingDTOList = myReadingDTOList;
-    }
-
     public static List<SensorData> getNeighbourSensors() {
         return neighbourSensors;
     }
 
-    public static void setNeighbourSensors(List<SensorData> neighbourSensors) {
-        Sensor.neighbourSensors = neighbourSensors;
-    }
 
     public static List<ReadingDTO> getMySentReadingDTOList() {
         return mySentReadingDTOList;
@@ -104,7 +84,7 @@ public class Sensor {
         //biljezenje pocetka rada aplikacije
         EmulatedSystemClock emulatedSystemClock = new EmulatedSystemClock();
 
-        //trazenje upisa identifikatora i UDP porta
+        //trazenje upisa identifikatora i UDP porta (generiranje u ovom slucaju zbog brzine)
         Integer id = Utils.generateRandomInteger(0, 100);
         Sensor.setSensorId(id);
         String adress = "localhost";

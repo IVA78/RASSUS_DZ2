@@ -36,6 +36,7 @@ public class KafkaConfig {
         return sensorConsumerProperties;
     }
 
+    //Senzor ima ulogu Consumera kada dohvaća naredbe na "Command" temi
     public static Properties getSensorConsumerCommandProperties() {
 
         Properties sensorConsumerProperties = new Properties();
