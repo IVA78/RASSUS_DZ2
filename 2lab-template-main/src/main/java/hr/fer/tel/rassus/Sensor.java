@@ -5,6 +5,7 @@ import hr.fer.tel.rassus.kafkaconfig.KafkaConfig;
 import hr.fer.tel.rassus.stupidudp.client.StupidUDPClient;
 import hr.fer.tel.rassus.stupidudp.network.EmulatedSystemClock;
 import hr.fer.tel.rassus.stupidudp.server.StupidUDPServer;
+import hr.fer.tel.rassus.utils.CustomComparator;
 import hr.fer.tel.rassus.utils.ReadingDTO;
 import hr.fer.tel.rassus.utils.SensorData;
 import hr.fer.tel.rassus.utils.Utils;
@@ -16,21 +17,17 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-import javax.swing.*;
-import java.net.InetAddress;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class Sensor {
     private static Long startTime = 0L;
     private static Integer sensorId;
     private static Integer vectorTime = 0;
 
-    private static List<ReadingDTO> neighboursReadingDTOList = new ArrayList<>();
-    private static List<ReadingDTO> myReadingDTOList = new ArrayList<>();
+    private volatile static List<ReadingDTO> neighboursReadingDTOList = new ArrayList<>();
+    private volatile static List<ReadingDTO> myReadingDTOList = new ArrayList<>();
     private static List<ReadingDTO> mySentReadingDTOList = new ArrayList<>();
     public static long getStartTime() {
         return startTime;
@@ -131,6 +128,34 @@ public class Sensor {
         sensorConsumerCommand.subscribe(Collections.singleton("Command"));
         Thread.sleep(3000);
 
+        //provjera je li poslana naredba "Stop" ili "Start"
+        Thread checkForStopAndStart = new Thread(() -> {
+
+            sensorConsumerCommand.seekToBeginning(sensorConsumerCommand.assignment());
+
+            while (!stop) {
+
+                ConsumerRecords<String, String> consumerRecords = sensorConsumerCommand.poll(Duration.ofMillis(1000));
+
+                for(ConsumerRecord<String,String> commandForProducer : consumerRecords){
+                    String got = "Received command: " + commandForProducer.value();
+
+                    System.out.println(got);
+
+                    if (commandForProducer.value().equals("Stop")) {
+                        stop = true;
+                    } else if (commandForProducer.value().equals("Start")) {
+                        start = true;
+                    }
+                }
+
+                sensorConsumerCommand.commitAsync();
+            }
+
+            System.exit(0);
+
+        }) ;
+        checkForStopAndStart.start();
 
 
         //cekanje kontrolne poruke "Start" - dohvat susjeda -> CONSUMER
@@ -176,28 +201,6 @@ public class Sensor {
                 System.out.println("Neighbour: " + neighbour);
             }
 
-            //provjera je li stigla poruka "Start"
-            sensorConsumerCommand.assignment().forEach(topicPartition -> {
-                sensorConsumerCommand.seekToBeginning(Collections.singleton(topicPartition));
-            });
-
-            ConsumerRecord<String, String> lastRecord = null;
-
-            while (lastRecord == null) {
-                ConsumerRecords<String, String> records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
-                for (ConsumerRecord<String, String> commandRecord : records) {
-                    lastRecord = commandRecord;
-                }
-
-                if(records.isEmpty()){
-                    break;
-                }
-            }
-
-            if(lastRecord != null && lastRecord.value().equals("Start")) {
-                start = true;
-            }
-
         }
 
 
@@ -215,10 +218,58 @@ public class Sensor {
         serverThread.start();
 
 
-        //sortitanje i izracunavanje srednje vrijednosti u vremenskom prozoru od 5 sekundi
-        //dretva ?
+        //sortitanje i izracunavanje srednje vrijednosti u vremenskom prozoru od 5 sekundi u zasebnoj dretvi
+        Thread sortingAndAvgThread = new Thread(()-> {
+            try {
+                while (!stop){
+                    Thread.sleep(5000);
+
+                    long currentTime = System.currentTimeMillis();
+
+                    System.out.println("Sensor " + sensorId + " sorting readings");
+                    List<ReadingDTO> readingDTOCombined = new ArrayList<>();
+                    readingDTOCombined.addAll(myReadingDTOList);
+                    readingDTOCombined.addAll(neighboursReadingDTOList);
+                    readingDTOCombined = readingDTOCombined.
+                            stream().
+                            filter(r -> currentTime - r.getScalarTime() <= 5000 )
+                            .collect(Collectors.toList());
+
+                    System.out.println("---------------------------------------------------------------------------");
+
+                    System.out.println("Readings before sort: ");
+                    for(ReadingDTO readingDTO : readingDTOCombined) {
+                        System.out.println(readingDTO);
+                    }
+
+                    System.out.println("---------------------------------------------------------------------------");
+
+                    Collections.sort(readingDTOCombined, new CustomComparator());
+                    System.out.println("Readings after sort: ");
+                    for(ReadingDTO readingDTO : readingDTOCombined) {
+                        System.out.println(readingDTO);
+                    }
+
+                    System.out.println("---------------------------------------------------------------------------");
 
 
+                    Double avg = readingDTOCombined
+                            .stream()
+                            .mapToDouble(r -> r.getNo2())
+                            .average().orElse(0.0);
+
+                    System.out.println("Average NO2 value: "+avg);
+
+
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+
+            }
+
+
+        });
+        sortingAndAvgThread.start();
 
 
         //GLAVNI DIO - funkcionalnost senzora
@@ -238,24 +289,6 @@ public class Sensor {
             vectorTime = vectorTime + 1;
             stupidUDPClient.sendReading(readingDTO);
             Thread.sleep(1000);
-
-            //provjera je li stigla "Stop poruka"
-            sensorConsumerCommand.assignment().forEach(topicPartition -> {
-                sensorConsumerCommand.seekToBeginning(Collections.singleton(topicPartition));
-            });
-
-            ConsumerRecord<String, String> lastRecord = null;
-
-            while (lastRecord == null) {
-                ConsumerRecords<String, String> records = sensorConsumerCommand.poll(Duration.ofMillis(1000));
-                for (ConsumerRecord<String, String> commandRecord : records) {
-                    lastRecord = commandRecord;
-                }
-            }
-
-            if(lastRecord != null && lastRecord.value().equals("Stop")) {
-                stop = true;
-            }
 
         }
 

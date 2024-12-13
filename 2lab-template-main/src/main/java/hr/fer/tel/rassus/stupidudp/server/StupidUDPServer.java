@@ -55,6 +55,7 @@ public class StupidUDPServer {
                 //povecavanje vlastitke vektorske vremenske oznake zbog primanja paketa -> VANJSKI DOGADJAJ
                 Sensor.setVectorTime(Sensor.getVectorTime()+1);
                 //Sensor.setVectorTime(Math.max(Sensor.getVectorTime(),readingDTO.getVectorTime()) + 1);
+                readingDTO.setVectorTime(Math.max(Sensor.getVectorTime(),readingDTO.getVectorTime()) + 1);
 
                 // provjera za duplicirane datagrame
                 List<ReadingDTO> readingDTOList = Sensor.getNeighboursReadingDTOList();

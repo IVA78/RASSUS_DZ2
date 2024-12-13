@@ -52,7 +52,11 @@ public class StupidUDPClient {
             while(true) {
 
                 System.out.println("Client " + Sensor.getSensorId() + "| sending data to sensor with id " + neighbour.getId()+" on port " + neighbour.getPort());
-                socket.send(packet); //SENDTO
+                try{
+                    socket.send(packet); //SENDTO
+                } catch (Exception e) {
+                    System.out.println("Client " + Sensor.getSensorId() + "| failed to send packet");
+                }
 
                 try {
                     // Cekanje na ACK
