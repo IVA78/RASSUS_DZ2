@@ -20,6 +20,9 @@ import javax.swing.*;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Sensor {
     private static Long startTime = 0L;
@@ -216,6 +219,8 @@ public class Sensor {
         //dretva ?
 
 
+
+
         //GLAVNI DIO - funkcionalnost senzora
         StupidUDPClient stupidUDPClient = new StupidUDPClient(0.3, 1000);
 
@@ -226,7 +231,11 @@ public class Sensor {
             myReadingDTOList.add(readingDTO);
             System.out.println("My reading (" + getSensorId() + "): "  + readingDTO.toString());
 
-            //slanje ocitanja od drugim senzorima
+            //azuriranje vektorske vremenske oznake pri generiranju ocitanja -> UNUTARNJI DOGADJAJ
+            vectorTime = vectorTime + 1;
+
+            //slanje ocitanja od drugim senzorima -> VANJSKI DOGADJAJ (povecavamo samo 1x jer je retransmisija prakticki "isti dogadjaj")
+            vectorTime = vectorTime + 1;
             stupidUDPClient.sendReading(readingDTO);
             Thread.sleep(1000);
 
@@ -262,7 +271,7 @@ public class Sensor {
 
         //ispis svega poslanog
         System.out.println("Sensor " + getSensorId() + "| Ispis svega poslanog");
-        for(ReadingDTO myReading : getMyReadingDTOList()) {
+        for(ReadingDTO myReading : getMySentReadingDTOList()) {
             System.out.println(myReading);
         }
 
@@ -277,4 +286,5 @@ public class Sensor {
 
 
     }
+
 }

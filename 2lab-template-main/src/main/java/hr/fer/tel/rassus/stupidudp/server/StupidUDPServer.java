@@ -52,6 +52,10 @@ public class StupidUDPServer {
                 ReadingDTO readingDTO = (ReadingDTO) SerializationUtils.deserialize(data);
                 System.out.println("Server " + Sensor.getSensorId() +"| received: " + readingDTO);
 
+                //povecavanje vlastitke vektorske vremenske oznake zbog primanja paketa -> VANJSKI DOGADJAJ
+                Sensor.setVectorTime(Sensor.getVectorTime()+1);
+                //Sensor.setVectorTime(Math.max(Sensor.getVectorTime(),readingDTO.getVectorTime()) + 1);
+
                 // provjera za duplicirane datagrame
                 List<ReadingDTO> readingDTOList = Sensor.getNeighboursReadingDTOList();
                 for (ReadingDTO readingDTOFromList : readingDTOList) {
@@ -67,8 +71,6 @@ public class StupidUDPServer {
                     readingDTOList.add(readingDTO);
                     Sensor.setNeighboursReadingDTOList(readingDTOList);
                     Sensor.setVectorTime(Sensor.getVectorTime() + 1);
-
-                    //vector time update??
 
                 } else {
                     msg = "ACK (REPEATED) for sensor with ID: " + readingDTO.getSensorId();

@@ -49,30 +49,32 @@ public class StupidUDPClient {
 
             DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, address, port);
 
+            while(true) {
 
-            System.out.println("Client " + Sensor.getSensorId() + "| sending data to sensor with id " + neighbour.getId()+" on port " + neighbour.getPort());
-            socket.send(packet); //SENDTO
+                System.out.println("Client " + Sensor.getSensorId() + "| sending data to sensor with id " + neighbour.getId()+" on port " + neighbour.getPort());
+                socket.send(packet); //SENDTO
 
-            try {
-                // Cekanje na ACK
+                try {
+                    // Cekanje na ACK
 
-                socket.receive(packetAck);
+                    socket.receive(packetAck);
 
-                String receiveString = new String(packetAck.getData(), packetAck.getOffset(), packetAck.getLength());
+                    String receiveString = new String(packetAck.getData(), packetAck.getOffset(), packetAck.getLength());
 
-                String ack = "  Client " + Sensor.getSensorId() +"| Ack recevided --> " + receiveString + " from port " +  packetAck.getPort();
-                System.out.println(ack);
+                    String ack = "  Client " + Sensor.getSensorId() +"| Ack recevided --> " + receiveString + " from port " +  packetAck.getPort();
+                    System.out.println(ack);
 
-                List<ReadingDTO> readingDTOList = Sensor.getMySentReadingDTOList();
-                readingDTOList.add(readingDTO);
-                Sensor.setNeighboursReadingDTOList(readingDTOList);
+                    List<ReadingDTO> readingDTOList = Sensor.getMySentReadingDTOList();
+                    readingDTOList.add(readingDTO);
+                    Sensor.setMySentReadingDTOList(readingDTOList);
+                    break;
 
-                //break;
-            } catch (SocketTimeoutException e) {
-                String lost = "Client " + Sensor.getSensorId() +"| I lost packet, sending again" + " to port " +  packetAck.getPort() + "\n";
-                System.out.println(lost);
-            } catch (Exception exception) {
-                Logger.getLogger(StupidUDPClient.class.getClass().getName()).log(Level.ALL, "Something went wrong", exception);
+                } catch (SocketTimeoutException e) {
+                    String lost = "Client " + Sensor.getSensorId() +"| I lost packet, sending again" + " to port " +  packetAck.getPort() + "\n";
+                    System.out.println(lost);
+                } catch (Exception exception) {
+                    Logger.getLogger(StupidUDPClient.class.getClass().getName()).log(Level.ALL, "Something went wrong", exception);
+                }
             }
             System.out.print("\n");
 
