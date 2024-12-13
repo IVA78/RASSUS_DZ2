@@ -28,6 +28,7 @@ public class Sensor {
 
     private static List<ReadingDTO> neighboursReadingDTOList = new ArrayList<>();
     private static List<ReadingDTO> myReadingDTOList = new ArrayList<>();
+    private static List<ReadingDTO> mySentReadingDTOList = new ArrayList<>();
     public static long getStartTime() {
         return startTime;
     }
@@ -89,6 +90,14 @@ public class Sensor {
 
     public static void setNeighbourSensors(List<SensorData> neighbourSensors) {
         Sensor.neighbourSensors = neighbourSensors;
+    }
+
+    public static List<ReadingDTO> getMySentReadingDTOList() {
+        return mySentReadingDTOList;
+    }
+
+    public static void setMySentReadingDTOList(List<ReadingDTO> mySentReadingDTOList) {
+        Sensor.mySentReadingDTOList = mySentReadingDTOList;
     }
 
     public static void main(String[] args) throws Exception {
@@ -240,5 +249,32 @@ public class Sensor {
             }
 
         }
+
+        System.out.println("---------------------------------------------------------------------------");
+
+        //ispis svega ocitanog
+        System.out.println("Sensor " + getSensorId() + "| Ispis svega ocitanog");
+        for(ReadingDTO myReading : getMyReadingDTOList()) {
+            System.out.println(myReading);
+        }
+
+        System.out.println("---------------------------------------------------------------------------");
+
+        //ispis svega poslanog
+        System.out.println("Sensor " + getSensorId() + "| Ispis svega poslanog");
+        for(ReadingDTO myReading : getMyReadingDTOList()) {
+            System.out.println(myReading);
+        }
+
+        System.out.println("---------------------------------------------------------------------------");
+
+
+        //ispis svega primljenog
+        System.out.println("Sensor " + getSensorId() + "| Ispis svega primljenog");
+        for(ReadingDTO neighbourReading : getNeighboursReadingDTOList()) {
+            System.out.println(neighbourReading);
+        }
+
+
     }
 }

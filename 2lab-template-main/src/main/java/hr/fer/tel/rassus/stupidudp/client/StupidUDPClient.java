@@ -63,7 +63,11 @@ public class StupidUDPClient {
                 String ack = "  Client " + Sensor.getSensorId() +"| Ack recevided --> " + receiveString + " from port " +  packetAck.getPort();
                 System.out.println(ack);
 
-                break;
+                List<ReadingDTO> readingDTOList = Sensor.getMySentReadingDTOList();
+                readingDTOList.add(readingDTO);
+                Sensor.setNeighboursReadingDTOList(readingDTOList);
+
+                //break;
             } catch (SocketTimeoutException e) {
                 String lost = "Client " + Sensor.getSensorId() +"| I lost packet, sending again" + " to port " +  packetAck.getPort() + "\n";
                 System.out.println(lost);
